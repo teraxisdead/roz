@@ -48,18 +48,27 @@ var IC = {
   drop: 'M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z',
   alert: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01',
   chart: 'M18 20V10 M12 20V4 M6 20v-6',
-  check: 'M20 6L9 17l-5-5'
+  check: 'M20 6L9 17l-5-5',
+  cloud: 'M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z'
 };
 function ic(n, s) { return '<svg class="i" viewBox="0 0 24 24"' + (s ? ' style="width:' + s + 'px;height:' + s + 'px"' : '') + '><path d="' + IC[n] + '"/></svg>'; }
 
 /* ===== data ===== */
 var KEY = 'roz-data-v1';
-var D = { food: [], study: [], work: [], exp: [], sleep: [], wts: [], off: {}, budget: 5000, lang: 'Random', wint: 2, dark: 0, sleeping: 0, focus: null, gkey: '', gmodel: 'gemini-2.5-flash', lastWater: 0, lastWt: '', g: { cal: 2000, study: 5, work: 45, sleep: 8 } };
+var D = { food: [], study: [], work: [], exp: [], sleep: [], wts: [], off: {}, budget: 5000, lang: 'Random', wint: 2, dark: 0, sleeping: 0, focus: null, gkey: '', gmodel: 'gemini-2.5-flash', lastWater: 0, lastWt: '', surl: '', token: '', updated: 0, wurl: '', push: 0, g: { cal: 2000, study: 5, work: 45, sleep: 8 } };
 function load() { try { var j = JSON.parse(localStorage.getItem(KEY)); if (j) { for (var k in j) D[k] = j[k]; } } catch (e) { } if (!D.g) D.g = { cal: 2000, study: 5, work: 45, sleep: 8 }; }
-function persist() { try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) { } }
+function core() { return { food: D.food, study: D.study, work: D.work, exp: D.exp, sleep: D.sleep, wts: D.wts, off: D.off, budget: D.budget, g: D.g, lang: D.lang, wint: D.wint }; }
+function persist() {
+  var js = JSON.stringify(core());
+  if (js !== U.lastJson) { U.lastJson = js; D.updated = Date.now(); schedPush(); }
+  try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) { }
+}
 load();
 var U = { tab: 'home', sub: '', date: TODAY, cal: 0, cy: 0, cm: 0, fsum: 0, offOpen: 0, ofr: 'Travel', wr: 30, rep: 'Week', wtype: 'Gym', msub: '', edit: '', err: '', q: '', cfl: [], ip: null };
-var TI = null, WL = null, TT = null;
+var TI = null, WL = null, TT = null, PT = null;
+U.lastJson = JSON.stringify(core());
+U.sy = 'ok'; U.syt = '';
+if (!D.updated && (D.study.length || D.food.length || D.work.length || D.exp.length || D.sleep.length || D.wts.length)) D.updated = Date.now();
 
 /* ===== quotes ===== */
 var Q = {
@@ -323,6 +332,8 @@ var V = {
       '<div class="h" style="margin-top:14px">Daily goals</div><div class="in"><input id="gcal" type="number" value="' + D.g.cal + '" placeholder="kcal"><input id="gst" type="number" step="0.5" value="' + D.g.study + '" placeholder="Study h"></div><div class="in"><input id="gwk" type="number" value="' + D.g.work + '" placeholder="Workout min"><input id="gsl" type="number" step="0.5" value="' + D.g.sleep + '" placeholder="Sleep h"></div><div style="font-size:12px;color:var(--t3);margin:-4px 0 6px">Calories, study (ghante), workout (min), sleep (ghante)</div><button class="btn" data-a="gsave" style="background:#534AB7;width:100%;padding:10px">Save goals</button>' +
       '<div class="h" style="margin-top:14px">Photo se calories (free Gemini key)</div><div style="font-size:13px;color:var(--t2);margin-bottom:6px">aistudio.google.com/apikey se free key lo aur yahan paste karo. Key sirf tumhare phone me rehti hai.</div><div class="in"><input id="gkey" type="password" placeholder="Gemini API key" value="' + esc(D.gkey) + '"></div><div class="in"><input id="gmodel" value="' + esc(D.gmodel) + '" placeholder="Model"></div><button class="btn" data-a="gk" style="background:#993C1D;width:100%;padding:10px">Save key</button>' +
       '<div class="row" style="margin-top:14px"><span>Dark mode</span><input type="checkbox" data-a="dark" ' + (D.dark ? 'checked' : '') + '></div>' +
+      '<div class="h" style="margin-top:14px">Cloud backup (Google Sheets)</div><div style="font-size:13px;color:var(--t2);margin-bottom:6px">Status: ' + (D.surl ? (U.sy === 'err' ? 'Error, URL ya token check karo' : U.sy === 'pend' ? 'Save ho raha hai...' : 'Synced ' + (U.syt || '')) : 'Band') + '</div><div class="in"><input id="csurl" placeholder="Apps Script Web app URL" value="' + esc(D.surl) + '"></div><div class="in"><input id="ctok" type="password" placeholder="Token" value="' + esc(D.token) + '"></div><div style="display:flex;gap:8px"><button class="btn" data-a="csave" style="background:#1D9E75;flex:1;padding:10px">Save and sync</button><button data-a="cpull" style="flex:1">Restore from cloud</button></div>' +
+      '<div class="h" style="margin-top:14px">Background reminders (app band ho tab bhi)</div><div style="font-size:13px;color:var(--t2);margin-bottom:6px">Status: ' + (D.push ? 'Chalu' : 'Band') + '</div><div class="in"><input id="cwurl" placeholder="Cloudflare Worker URL" value="' + esc(D.wurl) + '"></div><div style="display:flex;gap:8px"><button class="btn" data-a="pushon" style="background:#534AB7;flex:1;padding:10px">Chalu karo</button><button data-a="pushoff" style="flex:1">Band karo</button></div>' +
       '<div class="h" style="margin-top:14px">Backup</div><div style="display:flex;gap:8px"><button data-a="export" style="flex:1">Export</button><button data-a="import" style="flex:1">Import</button></div><div style="font-size:12px;color:var(--t3);margin-top:6px">Data sirf is phone me hai. Hafte me ek baar Export karke file save kar lo.</div>' +
       (U.ip ? '<button class="btn" data-a="install" style="background:#1D9E75;width:100%;padding:11px;margin-top:14px">Install Roz app</button>' : '<div style="font-size:12px;color:var(--t3);margin-top:14px">Install: Chrome menu me "Install app" ya "Add to Home screen".</div>') +
       '<button data-a="reset" style="width:100%;margin-top:14px;color:var(--danger)">Saara data delete karo</button>';
@@ -376,6 +387,7 @@ function draw() {
   $('nav').innerHTML = [['home', 'home', 'Home'], ['food', 'food', 'Food'], ['study', 'book', 'Study'], ['work', 'dumbbell', 'Workout'], ['more', 'grid', 'More']].map(function (x) { return '<button data-a="tab" data-v="' + x[0] + '" class="' + (U.tab === x[0] ? 'on' : '') + '">' + ic(x[1]) + x[2] + '</button>'; }).join('');
   var f = $('fab'); f.style.display = U.tab === 'home' && !D.focus && !U.sub && !U.cal ? 'flex' : 'none'; f.style.background = D.sleeping ? '#BA7517' : '#7F77DD'; f.innerHTML = ic(D.sleeping ? 'sun' : 'moon', 26);
   $('bBell').innerHTML = ic('bell', 18); $('bDark').innerHTML = ic(D.dark ? 'sun' : 'moon', 18);
+  setSync(U.sy);
   persist();
 }
 function r() { U.err = ''; U.edit = ''; draw(); }
@@ -399,7 +411,7 @@ function lock() { try { if (navigator.wakeLock) navigator.wakeLock.request('scre
 function unlock() { try { if (WL) { WL.release(); WL = null; } } catch (e) { } }
 function stopT() { clearInterval(TI); TI = null; }
 function finishPractice(f) {
-  stopT(); unlock();
+  stopT(); unlock(); pushCancel();
   D.study.push({ dt: ds(new Date(f.t0)), s: f.s, m: f.lim, t: 'Practice' }); D.focus = null; persist();
   showAlert('Time up! ' + f.s + ' practice (' + hm(f.lim) + ') complete ho gayi.');
   notify('Roz: time up', f.s + ' practice complete ho gayi.'); beep(); draw();
@@ -410,7 +422,7 @@ function tick() {
   if (!up && v <= 0) { finishPractice(f); return; }
   var e = $('big'); if (e) e.textContent = fmt(v);
 }
-function begin(f) { f.t0 = Date.now(); D.focus = f; persist(); stopT(); TI = setInterval(tick, 1000); lock(); draw(); }
+function begin(f) { f.t0 = Date.now(); D.focus = f; persist(); stopT(); TI = setInterval(tick, 1000); lock(); if (f.mode === 'down') pushTimer(f); draw(); }
 
 /* ===== food helpers ===== */
 function addParsed(text) {
@@ -449,6 +461,44 @@ function photoFood(file) {
   rd.readAsDataURL(file);
 }
 
+/* ===== cloud (Google Sheets) + background push ===== */
+var VAPID_PUBLIC = 'BLTrVI4dZozH5c3UAtU-dWpKxzGYY0md8s1Jol02L7S0n31KqfAPyySluPIvfbk6pI1ivWG5MHg928763OK02MI';
+function setSync(st) {
+  U.sy = st; if (st === 'ok') U.syt = new Date().toTimeString().slice(0, 5);
+  var cb = $('bCloud'); if (!cb) return;
+  cb.style.display = D.surl ? 'flex' : 'none'; cb.innerHTML = ic('cloud', 18);
+  cb.style.color = st === 'err' ? '#F09595' : st === 'pend' ? '#FAC775' : '#9FE1CB';
+}
+function schedPush() { if (!D.surl) return; setSync('pend'); clearTimeout(PT); PT = setTimeout(pushCloud, 3000); }
+function pushCloud() {
+  if (!D.surl) return; setSync('pend');
+  return fetch(D.surl, { method: 'POST', body: JSON.stringify({ token: D.token, updated: D.updated, data: core() }) })
+    .then(function (r) { return r.json(); }).then(function (j) { setSync(j && j.ok ? 'ok' : 'err'); }).catch(function () { setSync('err'); });
+}
+function applyCloud(j) {
+  var c = j.data;
+  ['food', 'study', 'work', 'exp', 'sleep', 'wts', 'off', 'budget', 'g', 'lang', 'wint'].forEach(function (k) { if (c[k] !== undefined) D[k] = c[k]; });
+  D.updated = j.updated; U.lastJson = JSON.stringify(core()); persist();
+  if (!document.activeElement || document.activeElement.tagName !== 'INPUT') draw();
+}
+function pullCloud(force) {
+  if (!D.surl) return;
+  fetch(D.surl + (D.surl.indexOf('?') > -1 ? '&' : '?') + 'token=' + encodeURIComponent(D.token)).then(function (r) { return r.json(); }).then(function (j) {
+    if (!j || !j.ok) { setSync('err'); return; }
+    if (j.data && (force || j.updated > D.updated)) { applyCloud(j); setSync('ok'); toast('Cloud se data aa gaya.'); }
+    else if (D.updated > (j.updated || 0)) pushCloud();
+    else setSync('ok');
+  }).catch(function () { setSync('err'); });
+}
+function b64uToU8(s) { var p = '='.repeat((4 - s.length % 4) % 4), b = (s + p).replace(/-/g, '+').replace(/_/g, '/'), r = atob(b), o = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) o[i] = r.charCodeAt(i); return o; }
+function cacheCfg() { try { caches.open('roz-cfg').then(function (c) { return c.put('roz-cfg.json', new Response(JSON.stringify({ url: D.wurl, token: D.token }))); }); } catch (e) { } }
+function getSub() { if (!('serviceWorker' in navigator) || !('PushManager' in window)) return Promise.resolve(null); return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).catch(function () { return null; }); }
+function wpost(path, body) { body.token = D.token; return fetch(D.wurl + path, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
+function subBody(sub) { return { sub: sub.toJSON(), wint: D.wint, tz: new Date().getTimezoneOffset(), wt: 1, wdone: wtd(TODAY) ? TODAY : '' }; }
+function pushSync() { if (!D.push || !D.wurl) return; getSub().then(function (sub) { if (sub) return wpost('/subscribe', subBody(sub)); }).catch(function () { }); }
+function pushTimer(f) { if (!D.push || !D.wurl) return; getSub().then(function (sub) { if (sub) return wpost('/timer', { endpoint: sub.endpoint, at: f.t0 + f.lim * 60000, s: f.s }); }).catch(function () { }); }
+function pushCancel() { if (!D.push || !D.wurl) return; getSub().then(function (sub) { if (sub) return wpost('/cancel', { endpoint: sub.endpoint }); }).catch(function () { }); }
+
 /* ===== actions ===== */
 function day(n) { var nd = ad(U.date, n); if (nd > TODAY) return; U.date = nd; U.fsum = 0; U.offOpen = 0; U.cy = pd(nd).getFullYear(); U.cm = pd(nd).getMonth(); r(); }
 var H = {
@@ -465,7 +515,7 @@ var H = {
   ofs: function () { var t = val('or'); if (U.ofr === 'Other' && !t) { U.err = 'Pehle reason likho'; draw(); return; } D.off[U.date] = { r: t || U.ofr }; U.offOpen = 0; r(); },
   newq: function () { pickQ(true); draw(); },
   lang: function (v) { D.lang = v; pickQ(false); draw(); },
-  wint: function (v) { D.wint = +v; D.lastWater = Date.now(); draw(); },
+  wint: function (v) { D.wint = +v; D.lastWater = Date.now(); draw(); pushSync(); },
   dis: function () { $('al').style.display = 'none'; },
   dark: function () { D.dark = D.dark ? 0 : 1; draw(); },
   test: function () { notify('Roz', 'Paani pi lo. Thoda paani piyo abhi.'); },
@@ -492,11 +542,11 @@ var H = {
   sstart: function () { var s = val('ss'); if (!s) { U.err = 'Subject ka naam likho'; draw(); return; } U.msub = s; begin({ mode: 'up', s: s }); },
   pstart: function () { var s = val('ps'), m = (+val('ph') || 0) * 60 + (+val('pm') || 0); if (!s) { U.err = 'Subject ka naam likho'; draw(); return; } if (m <= 0) { U.err = 'Time limit set karo (ghante ya minute)'; draw(); return; } U.msub = s; begin({ mode: 'down', s: s, lim: m }); },
   fstop: function () {
-    var f = D.focus; if (!f) return; stopT(); unlock();
+    var f = D.focus; if (!f) return; stopT(); unlock(); pushCancel();
     var m = Math.max(1, R((Date.now() - f.t0) / 60000)), dt = ds(new Date(f.t0));
     D.study.push({ dt: dt, s: f.s, m: m, t: f.mode === 'up' ? 'Study' : 'Practice' }); D.focus = null; U.tab = 'study'; U.sub = ''; U.date = dt; r(); toast(hm(m) + ' save hua: ' + f.s);
   },
-  fcancel: function () { stopT(); unlock(); D.focus = null; r(); },
+  fcancel: function () { stopT(); unlock(); pushCancel(); D.focus = null; r(); },
   sadd: function () { var s = val('ms'), m = (+val('mh') || 0) * 60 + (+val('mm') || 0); if (!s) { U.err = 'Subject ka naam likho'; draw(); return; } if (m <= 0) { U.err = 'Ghante ya minute daalo'; draw(); return; } D.study.push({ dt: U.date, s: s, m: m, t: 'Manual' }); U.msub = s; r(); },
   edit: function (v) { U.edit = v; draw(); },
   ecancel: function () { U.edit = ''; draw(); },
@@ -518,7 +568,7 @@ var H = {
     if (before < 1 && after >= 1) { showAlert('Budget khatam! Is mahine ka ₹' + D.budget + ' ka budget paar ho gaya.'); notify('Roz: budget', 'Mahine ka budget paar ho gaya.'); }
     else if (before < 0.8 && after >= 0.8) { showAlert('Dhyaan: budget ka 80% use ho gaya.'); notify('Roz: budget', 'Budget ka 80% use ho gaya.'); }
   },
-  wtadd: function () { var w = +val('wi'); if (!w || w < 20 || w > 300) { U.err = 'Weight kg me daalo'; draw(); return; } D.wts = D.wts.filter(function (x) { return x.dt !== U.date; }); D.wts.push({ dt: U.date, w: w }); D.wts.sort(function (a, b) { return a.dt < b.dt ? -1 : 1; }); r(); },
+  wtadd: function () { var w = +val('wi'); if (!w || w < 20 || w > 300) { U.err = 'Weight kg me daalo'; draw(); return; } D.wts = D.wts.filter(function (x) { return x.dt !== U.date; }); D.wts.push({ dt: U.date, w: w }); D.wts.sort(function (a, b) { return a.dt < b.dt ? -1 : 1; }); r(); pushSync(); },
   wr: function (v) { U.wr = +v; draw(); },
   rep: function (v) { U.rep = v; draw(); },
   fab: function () {
@@ -529,6 +579,26 @@ var H = {
     } else { D.sleeping = Date.now(); draw(); toast('Good night! Sleep time shuru.'); }
   },
   slsave: function () { var a = val('sb').split(':'), b = val('sw').split(':'); if (a.length < 2 || b.length < 2 || !val('sb') || !val('sw')) { U.err = 'Dono time chuno'; draw(); return; } var m = (+b[0] * 60 + +b[1]) - (+a[0] * 60 + +a[1]); if (m <= 0) m += 1440; D.sleep.push({ dt: U.date, h: R(m / 6) / 10 }); D.sleep.sort(function (x, y) { return x.dt < y.dt ? -1 : 1; }); r(); },
+  csave: function () {
+    var u = val('csurl'), t = val('ctok');
+    if (!u || !t) { toast('Sheets URL aur token dono daalo', 'warn'); return; }
+    D.surl = u; D.token = t; persist(); if (D.push) cacheCfg(); draw(); toast('Sync shuru ho raha hai...'); pullCloud(false);
+  },
+  cpull: function () { if (!D.surl) { toast('Pehle URL daalo', 'warn'); return; } if (confirm('Phone ka data cloud ke data se replace ho jayega. Pakka?')) pullCloud(true); },
+  syncnow: function () { toast('Sync ho raha hai...'); pullCloud(false); },
+  pushon: function () {
+    D.wurl = val('cwurl').replace(/\/+$/, ''); var t = val('ctok'); if (t) D.token = t;
+    if (!D.wurl || !D.token) { toast('Worker URL aur token daalo', 'warn'); return; }
+    if (!('PushManager' in window) || !('serviceWorker' in navigator) || !('Notification' in window)) { toast('Is browser me background reminders nahi hain. Chrome me install karke try karo.', 'warn'); return; }
+    Notification.requestPermission().then(function (p) {
+      if (p !== 'granted') { toast('Notification allow karna zaroori hai.', 'warn'); return; }
+      return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription().then(function (s) { return s || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToU8(VAPID_PUBLIC) }); }); }).then(function (sub) {
+        D.push = 1; cacheCfg(); persist();
+        return wpost('/subscribe', subBody(sub)).then(function (j) { if (j && j.ok) toast('Background reminders chalu ho gaye.'); else { D.push = 0; toast('Worker ne mana kiya. URL aur token check karo.', 'bad'); } draw(); });
+      });
+    }).catch(function () { D.push = 0; draw(); toast('Chalu nahi ho paaya. Worker URL check karo.', 'bad'); });
+  },
+  pushoff: function () { getSub().then(function (sub) { if (sub) { try { wpost('/unsub', { endpoint: sub.endpoint }); } catch (e) { } return sub.unsubscribe(); } }).catch(function () { }); D.push = 0; draw(); toast('Background reminders band.'); },
   gsave: function () { var c = +val('gcal'), s = +val('gst'), w = +val('gwk'), z = +val('gsl'); if (!c || !s || !w || !z) { toast('Saare goals daalo', 'warn'); return; } D.g = { cal: c, study: s, work: w, sleep: z }; draw(); toast('Goals save ho gaye.'); },
   gk: function () { D.gkey = val('gkey'); D.gmodel = val('gmodel') || 'gemini-2.5-flash'; draw(); toast('Key save ho gayi.'); },
   export: function () { var b = new Blob([JSON.stringify(D)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'roz-backup-' + TODAY + '.json'; document.body.appendChild(a); a.click(); a.remove(); toast('Backup file download ho gayi.'); },
@@ -539,6 +609,7 @@ var H = {
 
 /* ===== background checks ===== */
 function bgTick() {
+  if (D.push) return;
   var now = Date.now(), nd = new Date(), h = nd.getHours();
   if (D.wint > 0 && h >= 8 && h < 22) {
     if (!D.lastWater) { D.lastWater = now; persist(); }
@@ -570,9 +641,9 @@ $('imp').addEventListener('change', function () {
   };
   rd.readAsText(f);
 });
-document.addEventListener('visibilitychange', function () { if (!document.hidden) { refreshDay(); bgTick(); if (D.focus) { lock(); tick(); } } });
+document.addEventListener('visibilitychange', function () { if (!document.hidden) { refreshDay(); bgTick(); if (D.surl) pullCloud(false); if (D.focus) { lock(); tick(); } } });
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); U.ip = e; });
-$('bBell').setAttribute('data-a', 'test'); $('bDark').setAttribute('data-a', 'dark'); $('fab').setAttribute('data-a', 'fab');
+$('bCloud').setAttribute('data-a', 'syncnow'); $('bBell').setAttribute('data-a', 'test'); $('bDark').setAttribute('data-a', 'dark'); $('fab').setAttribute('data-a', 'fab');
 
 /* ===== start ===== */
 U.cy = pd(U.date).getFullYear(); U.cm = pd(U.date).getMonth();
@@ -580,4 +651,6 @@ pickQ(false);
 draw();
 if (D.focus) { TI = setInterval(tick, 1000); lock(); tick(); }
 setInterval(bgTick, 60000); bgTick();
+if (D.surl) pullCloud(false);
+if (D.push) { cacheCfg(); pushSync(); }
 if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () { }); }); }
